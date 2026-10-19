@@ -18,7 +18,7 @@ import sys
 
 import matplotlib
 
-# Use a non-interactive backend when there is no display (e.g. servers / CI)
+
 if not os.environ.get("DISPLAY") and sys.platform.startswith("linux"):
     matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -30,9 +30,7 @@ REQUIRED_COLUMNS = ["Date", "Product", "Category", "Price", "Quantity Sold", "To
 OUTPUT_DIR = "output"
 
 
-# --------------------------------------------------------------------------
-# 1. Data input & control-structure logic
-# --------------------------------------------------------------------------
+
 def validate_file(file_path):
     """Return (is_valid, message) after checking the CSV path and its header."""
     if not file_path.lower().endswith(".csv"):
@@ -44,7 +42,7 @@ def validate_file(file_path):
 
     with open(file_path, "r", encoding="utf-8") as fh:
         header = [h.strip() for h in fh.readline().strip().split(",")]
-    missing = [col for col in REQUIRED_COLUMNS if col not in header]  # loop + condition
+    missing = [col for col in REQUIRED_COLUMNS if col not in header]  
     if missing:
         return False, f"Missing required columns: {', '.join(missing)}"
     return True, "File format is valid."
@@ -81,18 +79,14 @@ def report_missing_values(df):
             print(f"  {col:<14}: {n_bad} non-positive value(s)")
 
 
-# --------------------------------------------------------------------------
-# 2. OOP: RetailAnalyzer
-# --------------------------------------------------------------------------
 class RetailAnalyzer:
     """Encapsulates loading, cleaning, analysing and plotting retail sales data."""
 
     def __init__(self):
-        self.data = None       # working DataFrame (possibly filtered)
-        self.raw_data = None   # cleaned full dataset
+        self.data = None      
+        self.raw_data = None   
         self.metrics = {}
 
-    # ---- loading & cleaning --------------------------------------------
     def load_data(self, file_path):
         """Read the CSV with Pandas, report issues and clean the dataset."""
         df = pd.read_csv(file_path)
@@ -108,24 +102,20 @@ class RetailAnalyzer:
         """Handle missing values and add computed columns."""
         df = df.copy()
         df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-        df = df.dropna(subset=["Date", "Product"])             # unusable rows
+        df = df.dropna(subset=["Date", "Product"])             
 
         df["Category"] = df["Category"].fillna("Unknown")
-        # Fill missing price with the product's median price (fallback: overall median)
         df["Price"] = df["Price"].fillna(df.groupby("Product")["Price"].transform("median"))
         df["Price"] = df["Price"].fillna(df["Price"].median())
         df["Quantity Sold"] = df["Quantity Sold"].fillna(df["Quantity Sold"].median()).round()
 
-        df = df[(df["Price"] > 0) & (df["Quantity Sold"] > 0)]  # drop invalid entries
-        # Recompute Total Sales so filled rows stay consistent
+        df = df[(df["Price"] > 0) & (df["Quantity Sold"] > 0)] 
         df["Total Sales"] = (df["Price"] * df["Quantity Sold"]).round(2)
 
-        # Additional computed columns
         df["Month"] = df["Date"].dt.to_period("M").astype(str)
         df["Sales Share %"] = np.round(100 * df["Total Sales"] / df["Total Sales"].sum(), 4)
         return df.reset_index(drop=True)
 
-    # ---- metrics ---------------------------------------------------------
     def calculate_metrics(self):
         """Compute total/average sales, top product, monthly growth (NumPy)."""
         df = self.data
@@ -133,7 +123,7 @@ class RetailAnalyzer:
             print("No data available to analyse.")
             return {}
 
-        sales = df["Total Sales"].to_numpy()                       # NumPy array
+        sales = df["Total Sales"].to_numpy()                       
         monthly = df.groupby("Month")["Total Sales"].sum().to_numpy()
         growth = np.diff(monthly) / monthly[:-1] * 100 if len(monthly) > 1 else np.array([])
 
@@ -155,7 +145,6 @@ class RetailAnalyzer:
         }
         return self.metrics
 
-    # ---- filtering -------------------------------------------------------
     def filter_data(self, condition):
         """
         Filter the working data. `condition` is a dict, e.g.
@@ -176,7 +165,6 @@ class RetailAnalyzer:
     def reset_filter(self):
         self.data = self.raw_data.copy()
 
-    # ---- summary ---------------------------------------------------------
     def display_summary(self):
         """Print a formatted summary report."""
         m = self.calculate_metrics()
@@ -199,7 +187,6 @@ class RetailAnalyzer:
             print(f"  {rank}. {prod:<15} {val:>14,.2f}")
         print(line)
 
-    # ---- visualisation ---------------------------------------------------
     def visualize(self, show=True):
         """Create bar chart, line graph and heatmap; save PNGs in ./output."""
         if self.data is None or self.data.empty:
@@ -209,7 +196,6 @@ class RetailAnalyzer:
         sns.set_theme(style="whitegrid", context="notebook")
         df = self.data
 
-        # Bar chart: total sales by category
         fig, ax = plt.subplots(figsize=(9, 5))
         cat = df.groupby("Category")["Total Sales"].sum().sort_values(ascending=False).reset_index()
         sns.barplot(data=cat, x="Category", y="Total Sales", hue="Category", palette="viridis",
@@ -220,7 +206,6 @@ class RetailAnalyzer:
         fig.tight_layout()
         fig.savefig(os.path.join(OUTPUT_DIR, "bar_sales_by_category.png"), dpi=150)
 
-        # Line graph: sales trend over time (monthly)
         fig, ax = plt.subplots(figsize=(10, 5))
         monthly = df.groupby("Month")["Total Sales"].sum().reset_index()
         sns.lineplot(data=monthly, x="Month", y="Total Sales", marker="o", linewidth=2.2,
@@ -231,7 +216,6 @@ class RetailAnalyzer:
         fig.tight_layout()
         fig.savefig(os.path.join(OUTPUT_DIR, "line_sales_trend.png"), dpi=150)
 
-        # Heatmap: correlation between price, quantity sold and total sales
         fig, ax = plt.subplots(figsize=(6.5, 5))
         corr = df[["Price", "Quantity Sold", "Total Sales"]].corr()
         sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", vmin=-1, vmax=1, square=True, ax=ax)
@@ -245,9 +229,6 @@ class RetailAnalyzer:
         plt.close("all")
 
 
-# --------------------------------------------------------------------------
-# 3. Interactive workflow
-# --------------------------------------------------------------------------
 def filter_menu(analyzer):
     """Ask the user for filter criteria and apply them."""
     cats = sorted(analyzer.raw_data["Category"].unique())
