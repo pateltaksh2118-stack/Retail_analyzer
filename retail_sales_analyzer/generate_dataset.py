@@ -4,7 +4,6 @@ import pandas as pd
 
 rng = np.random.default_rng(42)
 
-# Product catalogue: (product, category, base price)
 CATALOGUE = [
     ("Laptop", "Electronics", 55000), ("Smartphone", "Electronics", 25000),
     ("Headphones", "Electronics", 2500), ("Smart Watch", "Electronics", 8000),
@@ -23,7 +22,6 @@ rows = []
 for _ in range(500):
     product, category, base = CATALOGUE[rng.integers(len(CATALOGUE))]
     price = round(base * rng.uniform(0.9, 1.1), 2)
-    # cheaper items sell in larger quantities -> negative price/quantity correlation
     qty = int(max(1, rng.poisson(max(1.0, 12 - np.log10(price) * 2.5))))
     rows.append({
         "Date": rng.choice(dates).astype("datetime64[D]").astype(str),
@@ -35,8 +33,6 @@ for _ in range(500):
     })
 
 df = pd.DataFrame(rows).sort_values("Date").reset_index(drop=True)
-
-# Inject a few missing values so the cleaning logic can be demonstrated
 for col, n in [("Price", 4), ("Quantity Sold", 4), ("Category", 3)]:
     df.loc[rng.choice(len(df), n, replace=False), col] = np.nan
 
